@@ -1,0 +1,163 @@
+% 动态帧时隙 ALOHA（Dynamic Framed-Slotted ALOHA，DFSA）算法仿真（基于 Lower Bound 标签估算算法）
+% DFSA 是在 FSA 算法的基础上，提出帧长 N 要随着标签数 n 动态变化，使得系统效率接近最优值。
+% 仿真时设置第1帧（初始帧）帧长=64，128，256。1 帧结束后由相关数学理论公式推出下一帧的帧长，
+% 直至某一帧中不再产生碰撞时隙（即该帧中待读标签均成功识别）算法结束。
+
+% Lower Bound 估算算法说明-----------------------------------------------------------------------------------
+% 
+% 当一帧某个时隙内至少存在两个标签时，这个时隙就发生了碰撞。
+% Lower Bound 估算算法直接取了标签碰撞个数的下限值，即认为在每个碰撞的时隙内仅有两个标签。
+% 则在读写器识别范围内剩余的标签个数：n = 2*C(coll)
+% 式中：C(coll)——固定一帧内出现碰撞时隙的总数。
+% Lower Bound 估算算法仅仅是对一帧内发生碰撞标签个数的下限值进行估算。当标签个数较小时，
+% 标签估算的准确率比较高。当标签个数很大时，成功识别的时隙数变少，碰撞时隙数急剧增加，
+% 而每个碰撞时隙数内发生碰撞的标签会远大于两个，此时采用该方法进行标签数估算就会变得不精确，
+% 标签估算值与实际剩余的标签个数相比存在很大的误差，故此算法不适用于标签数量多的场合。
+% 
+% END----------------------------------------------------------------------------------------------------------
+
+clear;
+close all;
+clc;
+
+S1_64 = zeros(300, 41);  % DFSA-Lower Bound 标签估算算法系统吞吐率
+S1_128 = zeros(300, 41);
+S1_256 = zeros(300, 41);
+
+S1_avr_64 = zeros(1, 41);  % 系统平均吞吐率
+S1_avr_128 = zeros(1, 41);
+S1_avr_256 = zeros(1, 41);
+
+for cycle = 1:300  % 重复进行300次仿真测试
+    for TagsNum = 10:10:400
+        SlotNum = 0;  % 统计识别完全部标签所需要的总时隙数
+        N = 64;  % 设置初始帧长为64
+        temp = TagsNum;
+        while temp > 0
+            SlotNum=SlotNum+N;
+            [ succ , idle , coll ] = DFSA_anti ( temp , N );
+            N = 2*coll;
+            temp = temp - succ;
+        end
+        S1_64(cycle, TagsNum/10+1)=TagsNum/SlotNum;
+    end
+end
+
+for cycle = 1:300  % 重复进行300次仿真测试
+    for TagsNum = 10:10:400
+        SlotNum = 0;  % 统计识别完全部标签所需要的总时隙数
+        N = 128;  % 设置初始帧长为128
+        temp = TagsNum;
+        while temp > 0
+            SlotNum=SlotNum+N;
+            [ succ , idle , coll ] = DFSA_anti ( temp , N );
+            N = 2*coll;
+            temp = temp - succ;
+        end
+        S1_128(cycle, TagsNum/10+1)=TagsNum/SlotNum;
+    end
+end
+
+for cycle = 1:300  % 重复进行300次仿真测试
+    for TagsNum = 10:10:400
+        SlotNum = 0;  % 统计识别完全部标签所需要的总时隙数
+        N = 256;  % 设置初始帧长为256
+        temp = TagsNum;
+        while temp > 0
+            SlotNum=SlotNum+N;
+            [ succ , idle , coll ] = DFSA_anti ( temp , N );
+            N = 2*coll;
+            temp = temp - succ;
+        end
+        S1_256(cycle, TagsNum/10+1)=TagsNum/SlotNum;
+    end
+end
+
+for i = 2:41
+    S1_avr_64(i) = sum(S1_64(:, i))/300;
+    S1_avr_128(i) = sum(S1_128(:, i))/300;
+    S1_avr_256(i) = sum(S1_256(:, i))/300;
+end
+
+i = 0:10:400;
+figure(1)
+plot(i, S1_avr_64, 'kd-', i, S1_avr_128, 'rd-', i, S1_avr_256, 'bd-');
+xlim([0 400]);
+title('DFSA-Lower Bound 标签估算算法仿真');
+legend('初始帧长：64', '初始帧长：128', '初始帧长：256', 'location', 'best');
+xlabel('N：待识别标签数');
+ylabel('S：吞吐率');
+grid on;
+
+% 仿真结果说明--------------------------------------------------------------------------------------------------------
+% 
+% 考虑到阅读器在初始状态下无法估计其通信范围内标签的数目，在实际的算法执行过程中，阅读器需要经过多帧的调整
+% 才能达到帧长与待读标签数相接近，因此，在这个过程中就浪费了大量的时隙（或空闲或碰撞），算法效率有所降低。
+% 本次仿真分析了取不同初始帧长（N=64，N=128，N=256），采用碰撞标签数量下限估计系统吞吐率。
+% 帧长与待读标签数量越接近，调整帧长所需的时隙越少，算法效率越高。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+% 动态帧时隙 ALOHA（Dynamic Framed-Slotted ALOHA，DFSA）算法的碰撞处理函数
+
+function [ S_succ , S_idle , S_coll ] = DFSA_anti ( TagsNum , FrameLength )
+
+S_succ = 0;  % 成功时隙数
+S_idle = 0;  % 空闲时隙数
+S_coll = 0;  % 碰撞时隙数
+
+RandSlot = randi( [ 1 , FrameLength ] , 1 , TagsNum );   %每个标签在1-Framelenth中随机选一个时隙进行发送
+SlotCounter = ones( 1, TagsNum );
+% 处于待识别状态的标签随机的从帧长度 1-N 内选择一个时隙来传送数据，
+% 这个数值是通过自身携带的伪随机数发生器随机产生的，并且同时将自身的时隙计数器置 1
+
+SlotCheck = zeros( 1, FrameLength );  % 检测每帧中所有时隙的情况（成功/空闲/碰撞）
+
+for i = 1:FrameLength  % 开始帧内时隙的查询
+    Remove = [ ];  % 存储发生碰撞/正确识别的标签序号
+    for n = 1:TagsNum
+        if RandSlot(n) == SlotCounter(n)  % 开始帧内时隙的查询，每个标签将随机选择的时隙号与自身时隙计数器的号码进行比对
+            SlotCheck(i) = SlotCheck(i) + 1;  % 当两者相等时标签响应阅读器，并在此时隙内开始传送数据信息
+            Remove = [ Remove , n ];  % 将符合判断条件的标签序号存储到行向量 Remove 中
+        end  % 当两者不等时，标签不再传送数据信息而是保留此时隙号，并等待阅读器下一次的时隙查询命令
+    end
+    
+    % 在此阶段中，时隙内存在以下三种情况：
+    
+    if SlotCheck(i) == 0  % 阅读器未检测到标签的数据信息，也就是无标签在此时隙内传输，此时阅读器结束此时隙的查询
+        SlotCounter = SlotCounter +1;  % 并且所有标签将自身时隙计数器进行加 1 操作
+        S_idle = S_idle + 1;  % 该时隙为空闲时隙
+        
+    elseif SlotCheck(i) == 1  % 阅读器检测到数据信息并正确识别，也就是此时时隙内只有一个标签在传送消息
+        RandSlot(Remove(1)) = [ ];  % 阅读器接收到标签信息后会向标签发送一休眠指令，使标签进入休眠状态，
+        SlotCounter(Remove(1)) = [ ];  % 不再响应阅读器的任何指令。我们将其从 RandSlot 和 SlotCounter 矩阵中删除即可
+        SlotCounter = SlotCounter +1;  % 其他还处于待识别状态的标签将自身时隙计数器进行加 1 操作，等待阅读器下一时隙查询命令
+        TagsNum = TagsNum - 1;  % 更新本帧内待查询的标签数
+        S_succ = S_succ + 1;  % 该时隙为成功时隙
+        
+    else  % 阅读器检测到数据信息但无法正确识别出来，也就是此时隙内有多个标签在传送信息
+        for m = 1:length(Remove)  % 阅读器命令该时隙内的标签等待下一帧查询周期再发送数据
+            RandSlot( Remove(m)-(m-1) ) = [ ];
+            SlotCounter( Remove(m)-(m-1) ) = [ ];
+        end
+        SlotCounter = SlotCounter +1;  % 同时其余标签将自身时隙计数器进行加 1 操作
+        TagsNum = TagsNum - length(Remove);  % 更新本帧内待查询的标签数
+        S_coll = S_coll + 1;  % 该时隙为碰撞时隙
+    end
+end  % 当查询的时隙数与初始规定的帧长度 N 相等时，阅读器发送结束本帧的查询，
+end  % 并根据这一帧的 S_succ、S_idle 和 S_coll 来估计下一帧未被识别的标签数，以此调整下一帧的查询帧长度
+
